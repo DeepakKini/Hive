@@ -1,0 +1,196 @@
+managed_table
+
+CREATE TABLE new_table (usercode STRING,cr_date String, Status int) row format delimited fields terminated by ',';
+
+LOAD DATA INPATH '/tmp/data/Demodate.csv' INTO table new_table;
+
+
+LOAD DATA LOCAL INPATH "tmp/Demodate.csv" INTO TABLE demotable;
+
+DROP TABLE managed_table;
+
+---------------------------------------------------------------
+
+external_table
+
+CREATE EXTERNAL TABLE oper (operator_age int,name string ) row format delimited fields terminated by ','LOCATION '/home/shive/';
+
+
+LOAD DATA local INPATH '/tmp/data/Operatordetails.csv' INTO TABLE operatordetails;
+
+
+
+
+DROP TABLE operatordetails;
+
+-------------------------------------------------------------------
+student 
+
+CREATE EXTERNAL TABLE student (stname STRING,stno int,totmarks int)  LOCATION '/user/hive/tables' row format delimited fields terminated by ',';
+
+
+LOAD DATA INPATH '/user/hive/data/student.csv' INTO TABLE student;
+
+
+
+-------------------------------------------------------------------------------------
+<name>hive.cli.print.header</name>
+
+true
+
+
+set hive.cli.print.header=true;
+----------------------------------------------------------------------------------
+
+
+OVERWRITE INTO TABLE ;
+
+LOAD DATA LOCAL INPATH '/tmp/samplecode.csv' OVERWRITE INTO TABLE demotable ;
+
+LOAD DATA INPATH '/user/hive/data/samplecode.csv' OVERWRITE INTO TABLE demotable;
+-------------------------------------------------------------------------------------
+Alter table 
+
+ALTER TABLE student ADD COLUMNS (std_add string);
+
+
+----------------------------------------------------------------------------------------
+PARTITIONS IN HIVE
+
+CREATE TABLE student_new (name STRING,id int) PARTITIONED BY (ds STRING) row format delimited fields terminated by ',';
+
+ LOAD DATA LOCAL INPATH '/tmp/fct_mbp.csv' OVERWRITE INTO TABLE fct_mbp_new  PARTITION (ds='2013');
+
+2
+create table tmp(name STRING,id int,creationdate string) row format delimited fields terminated by ',';
+LOAD DATA LOCAL INPATH '/tmp/student_new.csv' OVERWRITE INTO TABLE tmp;
+
+CREATE TABLE student_part (name STRING,id int) PARTITIONED BY (ds STRING);
+
+INSERT OVERWRITE into TABLE student_part PARTITION(ds='2013' ) SELECT name,id,creationdate FROM tmp  WHERE creationdate='2013';
+
+-------------------------------------------------------------------------------------------
+Dynamic 
+To enable dynamic partitions
+
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict;
+set hive.exec.max.dynamic.partitions.pernode=300;
+set hive.enforce.bucketing = true;
+		We are using the dynamic partition without a static partition (A table can be partitioned based on multiple columns in hive) in such case we have to enable the non strict mode. In strict mode we can use dynamic partition only with a Static Partition.
+set hive.exec.max.dynamic.partitions.pernode=300;
+		The default value is 100, we have to modify the same according to the possible no of partitions that would come in your case
+set hive.exec.max.created.files=150000;
+
+
+
+CREATE TABLE Stage_oper_Month(oper_id string,Creation_Date string,oper_name String,oper_age int,oper_dept String, oper_dept_id int,opr_status string,EYEAR STRING,EMONTH STRING)ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
+
+LOAD DATA INPATH '/user/hive/data/user_info.csv'INTO TABLE  Stage_oper_Month; 
+
+CREATE TABLE Fact_oper_Month(oper_id string,Creation_Date string,oper_name String,oper_age int,oper_dept String, oper_dept_id int,opr_status string)PARTITIONED BY(eyear STRING, eMONTH STRING)ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
+
+
+
+FROM Stage_oper_Month 
+INSERT OVERWRITE TABLE Fact_oper_Month
+PARTITION(eyear,eMONTH)
+SELECT 
+oper_id,Creation_Date,oper_name,oper_age,oper_dept,oper_dept_id,opr_status,EYEAR,EMONTH
+DISTRIBUTE BY eyear,eMONTH;
+
+
+select oper_id,oper_name,oper_dept from Stage_oper_Month where eyear=2010 and emonth=1;
+
+
+
+
+-------------------------------------BUckets -----------------------------------------------
+CREATE TABLE Month_new (oper_id string,Creation_Date string,oper_name String,oper_age int,oper_dept String, oper_dept_id int,opr_status string,eyear string ,emonth string) CLUSTERED BY(oper_id) SORTED BY (oper_id,Creation_Date) INTO 4 BUCKETS ROW FORMAT DELIMITED FIELDS TERMINATED BY ','; 
+
+
+insert overwrite table Month_new
+select symbol, exchange, price, volume, cond, bid, ask, time
+from trades
+distribute by symbol sort by symbol, time;
+
+
+
+INSERT OVERWRITE TABLE Month_new
+SELECT 
+oper_id,Creation_Date,oper_name,oper_age,oper_dept,oper_dept_id,opr_status,EYEAR,EMONTH FROM Stage_oper_Month 
+DISTRIBUTE BY oper_id sort by oper_id,Creation_Date;
+
+
+
+CREATE TABLE Operator_split1(oper_id int,oper_code string,agency_code int,oper_name String,agency_name String,Creation_Date string)ROW FORMAT DELIMITED FIELDS TERMINATED BY ','; ---19912
+
+LOAD DATA LOCAL INPATH '/tmp/oper_split.csv' OVERWRITE INTO TABLE Operator_split1 ;
+
+
+CREATE TABLE operator_split_two(oper_id int,oper_code string,agency_code int,oper_name String,agency_name String,Creation_Date string)ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
+
+LOAD DATA LOCAL INPATH '/tmp/oper_split_2.csv' OVERWRITE INTO TABLE operator_split_two ;
+
+CREATE TABLE oper_bucket (oper_id int,oper_code string,agency_code int,oper_name String,agency_name String,Creation_Date string) CLUSTERED BY(oper_id) SORTED BY (oper_id,Creation_Date) INTO 6 BUCKETS ROW FORMAT DELIMITED FIELDS TERMINATED BY ','; 
+
+
+INSERT OVERWRITE TABLE oper_bucket
+SELECT 
+oper_id,oper_code,agency_code,oper_name,agency_name,Creation_Date FROM operator_split1
+
+DISTRIBUTE BY oper_id sort by oper_id,Creation_Date;
+
+
+
+
+SELECT count(*) FROM month_new TABLESAMPLE(BUCKET 2 OUT OF 4 ON oper_id);WHERE eyear=’2011’ AND eMONTH=’11’;
+SELECT * FROM Month TABLESAMPLE(BUCKET 2 OUT OF 4 ON  rand()) WHERE eyear='2011'
+
+SELECT * FROM Month TABLESAMPLE(2 PERCENT) ;
+SELECT * FROM Month TABLESAMPLE ( 20 ROWS) WHERE eyear='2011' ;
+TABLESAMPLE(BUCKET 3 OUT OF 16 ON id)
+from tmp INSERT OVERWRITE TABLE student PARTITION(dt) select name ,id from student where creationdate='2013';
+
+
+SET mapred.child.java.opts="-server -Xmx512M"
+
+CREATE  TABLE buckt_test (oper_id int,oper_code string,agency_code int,oper_name String,agency_name String,Creation_Date string) PARTITIONED BY (eyear STRING) CLUSTERED BY(oper_id) SORTED BY (oper_id) INTO 6 BUCKETS ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
+
+CREATE TABLE buckt_dump(oper_id int,oper_code string,agency_code int,oper_name String,agency_name String,Creation_Date string,eyear STRING)ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
+
+LOAD DATA LOCAL INPATH '/tmp/oper_split.csv' OVERWRITE INTO TABLE buckt_dump ;
+
+FROM buckt_dump 
+INSERT OVERWRITE TABLE buckt_test
+PARTITION(eyear=2013)
+SELECT 
+oper_id,oper_code,agency_code,oper_name,agency_name,Creation_Date,eyear 
+DISTRIBUTE BY eyear,oper_id sort by oper_id;
+
+INSERT OVERWRITE TABLE buckt_test
+SELECT 
+oper_id,oper_code,agency_code,oper_name,agency_name,Creation_Date,eyear FROM buckt_dump 
+DISTRIBUTE BY oper_id sort by oper_id,Creation_Date;
+LOCATION '/home/test_dir';
+
+CREATE TABLE Fact_oper_Month(oer_id string,Creation_Date string,oper_name String,oper_age int,oper_dept String,oper_dept_id int,opr_status string)PARTITIONED BY(eyear STRING, eMONTH STRING)ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
+
+CREATE  TABLE IF NOT EXISTS test_table(Id INT,name String) PARTITIONED BY (dt STRING,hour STRING) CLUSTERED BY(country,continent) SORTED BY(country,continent) INTO 4 BUCKETS ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
+
+
+create tables users(id int, name String) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
+LOAD DATA LOCAL INPATH '/tmp/users.csv' OVERWRITE INTO TABLE users ;
+
+CREATE INDEX new_index ON TABLE users(id) AS 'org.apache.hadoop.hive.ql.index.compact.CompactIndexHandler';;
+
+CREATE VIEW view_name (id,name)  AS SELECT * from users;
+--------------------------------------------------------------------------------------
+select commands
+SHOW PARTITIONS month_part;
+
+  INSERT OVERWRITE LOCAL DIRECTORY '/tmp/tuser' SELECT * FROM users;
+
+
+select oer_id,encription(oper_name) from Fact_oper_Month limit 10;
+create temporary function encription as 'Sha1encryption';
